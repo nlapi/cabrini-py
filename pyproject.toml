@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cabrini"
+version = "0.1.0"
+description = "US stock market data for AI agents — 23 years of minute bars, SEC fundamentals, filings, insiders. Pay per query with USDC via x402."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [{ name = "Cabrini", email = "hello@cabrini.ai" }]
+keywords = ["finance", "market-data", "stocks", "ai-agents", "x402", "usdc", "mcp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "httpx>=0.24",
+    "eth-account>=0.9",
+    "web3>=6.0",
+]
+
+[project.optional-dependencies]
+langchain = ["langchain-core>=0.2"]
+crewai = ["crewai>=0.50"]
+
+[project.urls]
+Homepage = "https://cabrini.ai"
+Documentation = "https://cabrini.ai/docs"
+Repository = "https://github.com/cabrini-ai/cabrini-py"
