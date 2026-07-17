@@ -122,3 +122,5 @@ The `Cabrini` client handles all of this automatically. You just need a wallet w
 - API docs: https://cabrini.ai/docs
 - Agent guide: https://cabrini.ai/agents
 - MCP endpoint: https://cabrini.ai/mcp
+
+<!-- mcp-name: ai.cabrini/market-data -->
