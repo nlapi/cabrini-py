@@ -39,45 +39,72 @@ class Cabrini:
         return self._account.address
 
     def query(self, ticker: str, date: str, interval: int = 3, adjusted: bool = False) -> Dict[str, Any]:
-        """Query intraday OHLCV bars for a single ticker/date. $0.025"""
+        """Intraday bars for one ticker/date. $0.025
+
+        Each bar carries pct_open/pct_high/pct_low/pct_close — fractional change
+        from that day's open — plus volume and transactions. For absolute prices,
+        get the open from daily() and compute price = day_open * (1 + pct).
+        """
         return self._paid_request("POST", "/v1/query", json={
             "ticker": ticker, "date": date, "interval": interval, "adjusted": adjusted,
         })
 
     def daily(self, ticker: str, start: str, end: str, adjusted: bool = False) -> Dict[str, Any]:
-        """Query daily OHLCV for a date range. $0.01/day"""
+        """Daily OHLCV bars plus VWAP for a date range. $0.001 per year.
+
+        This is the endpoint that carries absolute price levels.
+        """
         return self._paid_request("POST", "/v1/daily", json={
             "ticker": ticker, "start": start, "end": end, "adjusted": adjusted,
         })
 
     def batch(self, tickers: list, date: str, interval: int = 3) -> Dict[str, Any]:
-        """Query up to 10 tickers at once. $0.10"""
+        """Intraday bars for several tickers on one date. $0.02 per ticker, no limit.
+
+        Each ticker is referenced to its own daily open.
+        """
         return self._paid_request("POST", "/v1/batch", json={
             "tickers": tickers, "date": date, "interval": interval,
         })
 
     def range(self, ticker: str, start: str, end: str, interval: int = 60) -> Dict[str, Any]:
-        """Multi-day intraday bars. $0.015"""
+        """Multi-day intraday bars. $0.01 per trading day, no limit.
+
+        Percentages reset to each day's own open — they are not cumulative.
+        """
         return self._paid_request("POST", "/v1/range", json={
             "ticker": ticker, "start": start, "end": end, "interval": interval,
         })
 
     def bars(self, ticker: str, date: str, interval: int = 60) -> Dict[str, Any]:
-        """Flexible bar query. $0.02"""
+        """Resampled intraday bars at a custom interval. $0.015 per day."""
         return self._paid_request("POST", "/v1/bars", json={
             "ticker": ticker, "date": date, "interval": interval,
         })
 
-    def scan(self, date: str) -> Dict[str, Any]:
-        """Scan all tickers on a date. $0.25"""
-        return self._paid_request("POST", "/v1/scan", json={"date": date})
+    def scan(self, date: str, **criteria: Any) -> Dict[str, Any]:
+        """Screen every US stock on a date. $0.10
+
+        At least one criterion is required or the API returns 400. Accepts
+        gap_up_pct, gap_down_pct, change_pct_min, change_pct_max, volume_min,
+        volume_ratio_min, transactions_min, limit — all in percent (5 = 5%).
+
+        Returns pct_change, pct_gap, volume and volume_ratio per match
+        (fractional: 0.05 = 5%).
+        """
+        if not criteria:
+            raise ValueError(
+                "scan() needs at least one criterion, e.g. "
+                "scan(date, volume_min=1_000_000) or scan(date, gap_up_pct=5)"
+            )
+        return self._paid_request("POST", "/v1/scan", json={"date": date, **criteria})
 
     def tickers(self, date: str) -> Dict[str, Any]:
         """List all tickers traded on a date. $0.005"""
         return self._paid_request("GET", "/v1/tickers", params={"date": date})
 
     def company(self, ticker: str) -> Dict[str, Any]:
-        """Company metadata. $0.001"""
+        """Company profile from SEC EDGAR. $0.005"""
         return self._paid_request("GET", "/v1/company", params={"ticker": ticker})
 
     def fundamentals(self, ticker: str) -> Dict[str, Any]:
@@ -85,7 +112,7 @@ class Cabrini:
         return self._paid_request("POST", "/v1/fundamentals", json={"ticker": ticker})
 
     def filings(self, ticker: str, form_type: Optional[str] = None) -> Dict[str, Any]:
-        """SEC filings. $0.02"""
+        """SEC filing index. $0.01, or $0.05 with extracted section text."""
         body = {"ticker": ticker}
         if form_type:
             body["form_type"] = form_type
@@ -96,7 +123,7 @@ class Cabrini:
         return self._paid_request("POST", "/v1/insiders", json={"ticker": ticker})
 
     def brief(self, ticker: str) -> Dict[str, Any]:
-        """Full company brief (fundamentals + filings + insiders). $0.04"""
+        """Joined research brief: price + fundamentals + insiders + splits. $0.25"""
         return self._paid_request("POST", "/v1/brief", json={"ticker": ticker})
 
     def _paid_request(self, method: str, path: str, **kwargs) -> Dict[str, Any]:

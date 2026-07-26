@@ -1,6 +1,6 @@
 # cabrini
 
-US stock market data for AI agents. 23 years of minute-level OHLCV bars, SEC fundamentals, filings, and insider data — every US equity from 2003 to present.
+US stock market data for AI agents. 23 years of intraday and daily bars, SEC fundamentals, filings, and insider data — every US equity from 2003 to present.
 
 Pay per query with USDC on Base (x402). No API keys, no subscriptions, no signup.
 
@@ -17,16 +17,16 @@ from cabrini import Cabrini
 
 c = Cabrini(private_key="0x...")  # any Base wallet with USDC
 
-# Intraday bars — $0.025
+# Intraday bars (pct from daily open) — $0.025
 bars = c.query("AAPL", "2024-01-15")
 
-# Daily bars — $0.01/day
+# Daily OHLCV + VWAP (absolute prices) — $0.001/year
 daily = c.daily("TSLA", "2024-01-01", "2024-03-31")
 
 # SEC fundamentals — $0.02
 fins = c.fundamentals("NVDA")
 
-# Full research brief — $0.04
+# Full research brief — $0.25
 brief = c.brief("MSFT")
 ```
 
@@ -86,17 +86,45 @@ Point any MCP client at `https://cabrini.ai/mcp`:
 | Method | Price | Description |
 |--------|-------|-------------|
 | `query(ticker, date)` | $0.025 | Full trading day of intraday bars |
-| `daily(ticker, start, end)` | $0.01/day | Daily OHLCV |
-| `batch(tickers, date)` | $0.10 | Up to 10 tickers at once |
-| `range(ticker, start, end)` | $0.015 | Multi-day intraday |
-| `bars(ticker, date)` | $0.02 | Flexible bar query |
-| `scan(date)` | $0.25 | All tickers on a date |
+| `daily(ticker, start, end)` | $0.001/year | Daily OHLCV + VWAP — the absolute prices |
+| `batch(tickers, date)` | $0.02/ticker | Several tickers, one date, no limit |
+| `range(ticker, start, end)` | $0.01/trading day | Multi-day intraday, no limit |
+| `bars(ticker, date, interval)` | $0.015/day | Resampled intraday, 3-240 min |
+| `scan(date, **criteria)` | $0.10 | Screen every US stock; needs >= 1 criterion |
 | `tickers(date)` | $0.005 | List traded tickers |
-| `company(ticker)` | $0.001 | Company metadata |
+| `company(ticker)` | $0.005 | Company profile from SEC EDGAR |
 | `fundamentals(ticker)` | $0.02 | SEC quarterly data |
-| `filings(ticker)` | $0.02 | SEC filings + text |
-| `insiders(ticker)` | $0.02 | Insider transactions |
-| `brief(ticker)` | $0.04 | Full research brief |
+| `filings(ticker)` | $0.01 / $0.05 | SEC filing index; +extracted section text |
+| `insiders(ticker)` | $0.02 | Insider transactions (Form 4) |
+| `brief(ticker)` | $0.25 | Joined research brief |
+
+Prices are quoted live in each `402` response and the client pays whatever the server
+asks — this table is documentation, not the source of truth.
+
+## Output format
+
+Intraday methods (`query`, `range`, `batch`, `bars`) return **fractional change from the
+daily open**, not price levels:
+
+```python
+{"window_start": "2024-01-02T14:30:00", "timestamp": 1704204600000000000,
+ "pct_open": 0.0, "pct_high": 0.0012, "pct_low": -0.0003, "pct_close": 0.0008,
+ "volume": 47000, "transactions": 312}
+```
+
+`pct_x = (bar_x - day_open) / day_open`, so `0.0012` is +0.12%.
+
+`daily()` carries the absolute levels — open, high, low, close, volume, transactions and
+VWAP. Combine the two to reconstruct prices:
+
+```python
+day = c.daily("AAPL", "2024-01-02", "2024-01-02")["data"][0]
+bars = c.query("AAPL", "2024-01-02")["data"]
+close_price = day["open"] * (1 + bars[-1]["pct_close"])
+```
+
+Use `daily()` rather than a third-party open: our reference is the first bar of the
+session and includes pre-market, so an external 09:30 open will not reconcile exactly.
 
 ## How payment works
 
